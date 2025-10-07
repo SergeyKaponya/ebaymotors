@@ -1,0 +1,63 @@
+import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import { store } from '../services/store';
+import { runOCROnImages } from '../services/ocrService';
+import { generateListingData } from '../services/aiService';
+import { ListingDraft } from '../domain/models';
+
+export const listingsRouter = Router();
+
+// Multer config for this router only (memory)
+const upload = multer({ storage: multer.memoryStorage(), limits: { files: 20, fileSize: 10 * 1024 * 1024 } });
+
+// List drafts
+listingsRouter.get('/drafts', (req: Request, res: Response) => {
+  res.json(store.listDrafts());
+});
+
+// Create draft
+listingsRouter.post('/drafts', (req: Request, res: Response) => {
+  const draft = store.createListingDraft(req.body || {});
+  res.status(201).json(draft);
+});
+
+// Get listing by id
+listingsRouter.get('/:id', (req: Request, res: Response) => {
+  const l = store.getListing(req.params.id);
+  if (!l) return res.status(404).json({ error: 'Not found' });
+  res.json(l);
+});
+
+// Update listing
+listingsRouter.put('/:id', (req: Request, res: Response) => {
+  const updated = store.updateListing(req.params.id, req.body || {});
+  if (!updated) return res.status(404).json({ error: 'Not found' });
+  res.json(updated);
+});
+
+// Publish listing
+listingsRouter.post('/:id/publish', (req: Request, res: Response) => {
+  const published = store.publishListing(req.params.id);
+  if (!published) return res.status(404).json({ error: 'Not found' });
+  res.json(published);
+});
+
+// Generate (OCR + AI) suggestions
+listingsRouter.post('/generate', upload.array('images', 20), async (req: Request, res: Response) => {
+  try {
+  const files = (req.files as any[]) || [];
+    const { vehicle, partNumber, existingCompatibility } = req.body || {};
+
+    const ocr = files.length ? await runOCROnImages(files) : {};
+    const aiResult = await generateListingData({
+      ocr,
+      partNumber,
+      existingCompatibility: existingCompatibility ? JSON.parse(existingCompatibility) : []
+    });
+
+    res.json({ ok: true, ocr, ...aiResult, images: files.map(f=>f.originalname) });
+  } catch (e) {
+    console.error('generate error', e);
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
