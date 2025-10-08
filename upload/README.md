@@ -62,11 +62,15 @@
   ```
 
   ## Environment Variables
-  Backend:
-  ```
-  OPENAI_API_KEY= # optional for future real AI calls
-  PORT=4000
-  ```
+Backend:
+```
+OPENAI_API_KEY= # optional for future real AI calls
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_TEMPERATURE=0.4
+OPENAI_BASE_URL=
+OPENAI_MCP_CONNECTORS=
+PORT=4000
+```
 
   Frontend:
   ```

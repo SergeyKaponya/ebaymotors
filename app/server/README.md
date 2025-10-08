@@ -11,6 +11,10 @@ This service powers OCR + AI assisted creation of eBay Motors part listings.
 Copy `.env.example` to `.env`:
 ```
 OPENAI_API_KEY= # optional, if omitted mock AI is used
+OPENAI_MODEL=gpt-4.1-mini      # optional override
+OPENAI_TEMPERATURE=0.4         # optional float
+OPENAI_BASE_URL=               # optional (Azure / proxy)
+OPENAI_MCP_CONNECTORS=         # optional comma separated connector IDs
 PORT=4000
 ```
 
