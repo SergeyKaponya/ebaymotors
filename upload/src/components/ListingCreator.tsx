@@ -168,6 +168,9 @@ export function ListingCreator() {
       setImageFiles(updatedFiles);
 
       await triggerOCRAnalysis(updatedFiles);
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 

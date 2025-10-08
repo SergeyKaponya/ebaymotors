@@ -39,7 +39,8 @@ export async function preprocessImage(buffer: Buffer): Promise<Buffer> {
         fit: 'inside',
         withoutEnlargement: true
       })
-      .normalize();
+      .normalize()
+      .png({ compressionLevel: 0 });
 
     return await pipeline.toBuffer();
   } catch (err) {

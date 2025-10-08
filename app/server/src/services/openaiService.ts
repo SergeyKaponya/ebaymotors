@@ -28,7 +28,7 @@ export interface OpenAIListingResult {
 
 let cachedClient: OpenAI | null = null;
 
-function getClient(apiKey: string): OpenAI {
+export function getOpenAIClient(apiKey: string): OpenAI {
   if (cachedClient) return cachedClient;
   cachedClient = new OpenAI({
     apiKey,
@@ -81,7 +81,7 @@ export async function generateWithOpenAI(params: OpenAIListingParams): Promise<O
     : 0.4;
   const tools = buildTools();
 
-  const client = getClient(apiKey);
+  const client = getOpenAIClient(apiKey);
 
   const compatibilitySummary = (params.compatibility || [])
     .map(entry => `${entry.year} ${entry.make} ${entry.model} (${entry.verified ? 'verified' : 'unverified'})`)
@@ -228,7 +228,7 @@ export async function pickLikelyPartNumber(
     ? Number(process.env.OPENAI_TEMPERATURE)
     : 0.1;
   const tools = buildTools();
-  const client = getClient(apiKey);
+  const client = getOpenAIClient(apiKey);
 
   const prompt = [
     `You analyze OCR outputs from automotive part labels.`,
