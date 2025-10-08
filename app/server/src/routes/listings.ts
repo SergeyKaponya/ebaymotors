@@ -45,19 +45,58 @@ listingsRouter.post('/:id/publish', (req: Request, res: Response) => {
 // Generate (OCR + AI) suggestions
 listingsRouter.post('/generate', upload.array('images', 20), async (req: Request, res: Response) => {
   try {
-  const files = (req.files as any[]) || [];
-    const { vehicle, partNumber, existingCompatibility } = req.body || {};
+    const files = (req.files as any[]) || [];
+    const { partNumber } = req.body || {};
+
+    let vehicleData: any;
+    const rawVehicle = (req.body || {}).vehicle;
+    if (rawVehicle) {
+      try {
+        vehicleData = typeof rawVehicle === 'string' ? JSON.parse(rawVehicle) : rawVehicle;
+      } catch (err) {
+        console.warn('Failed to parse vehicle payload', err);
+      }
+    }
+
+    let compatibilityPayload: any[] = [];
+    const rawCompatibility = (req.body || {}).existingCompatibility;
+    if (rawCompatibility) {
+      try {
+        compatibilityPayload = typeof rawCompatibility === 'string'
+          ? JSON.parse(rawCompatibility)
+          : Array.isArray(rawCompatibility) ? rawCompatibility : [];
+      } catch (err) {
+        console.warn('Failed to parse compatibility payload', err);
+      }
+    }
 
     const ocr = files.length ? await runOCROnImages(files) : {};
     const aiResult = await generateListingData({
       ocr,
       partNumber,
-      existingCompatibility: existingCompatibility ? JSON.parse(existingCompatibility) : []
+      vehicle: vehicleData,
+      existingCompatibility: compatibilityPayload
     });
 
     res.json({ ok: true, ocr, ...aiResult, images: files.map(f=>f.originalname) });
   } catch (e) {
     console.error('generate error', e);
+    res.status(500).json({ ok: false, error: String(e) });
+  }
+});
+
+// OCR-only endpoint for faster UI feedback
+listingsRouter.post('/ocr', upload.array('images', 20), async (req: Request, res: Response) => {
+  try {
+    const files = (req.files as any[]) || [];
+    if (!files.length) {
+      return res.status(400).json({ ok: false, error: 'No images uploaded' });
+    }
+
+    const ocr = await runOCROnImages(files);
+    res.json({ ok: true, ocr });
+  } catch (e) {
+    console.error('ocr error', e);
     res.status(500).json({ ok: false, error: String(e) });
   }
 });

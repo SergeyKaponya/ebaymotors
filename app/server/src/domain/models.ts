@@ -25,6 +25,7 @@ export interface OCRResult {
   partNumber?: string;
   vehicleInfo?: string; // e.g., "2018-2022 Chevrolet Equinox"
   rawText?: string;
+  detectedTexts?: string[];
   confidence?: number; // 0-100
 }
 

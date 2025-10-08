@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { generateListing, saveDraft } from '../api';
+import { analyzeOCR, generateListing, saveDraft } from '../api';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -49,6 +49,7 @@ interface OCRData {
   partNumber: string;
   vehicleInfo: string;
   rawText: string;
+  detectedTexts: string[];
   confidence: number;
   processingComplete: boolean;
 }
@@ -103,6 +104,7 @@ export function ListingCreator() {
     partNumber: '',
     vehicleInfo: '',
     rawText: '',
+    detectedTexts: [],
     confidence: 0,
     processingComplete: false
   });
@@ -123,27 +125,49 @@ export function ListingCreator() {
   const maxImages = 20;
   const initialDisplaySlots = 8;
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const triggerOCRAnalysis = async (filesToAnalyze: File[]) => {
+    if (!filesToAnalyze.length) return;
+    setOcrData(prev => ({
+      ...prev,
+      processingComplete: false,
+      detectedTexts: [],
+      rawText: prev.rawText,
+      confidence: 0
+    }));
+    try {
+      const resp = await analyzeOCR(filesToAnalyze);
+      if (!resp.ok) throw new Error(resp.error || 'Failed to analyze images');
+      const data = resp.ocr || {};
+      setOcrData({
+        partNumber: data.partNumber || '',
+        vehicleInfo: data.vehicleInfo || '',
+        rawText: data.rawText || '',
+        detectedTexts: data.detectedTexts || [],
+        confidence: data.confidence || 0,
+        processingComplete: true
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || 'OCR processing failed');
+      setOcrData(prev => ({
+        ...prev,
+        processingComplete: true
+      }));
+    }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
       const remainingSlots = maxImages - images.length;
       const filesToProcess = Array.from(files).slice(0, remainingSlots);
       const newImages = filesToProcess.map(file => URL.createObjectURL(file));
-      setImages(prev => [...prev, ...newImages]);
-      setImageFiles(prev => [...prev, ...filesToProcess]);
-      
-      // Simulate OCR processing
-      setOcrData(prev => ({ ...prev, processingComplete: false }));
-      
-      setTimeout(() => {
-        setOcrData({
-          partNumber: 'GM-45123-789',
-          vehicleInfo: '2018-2022 Chevrolet Equinox',
-          rawText: 'GENUINE GM PART\nBRAKE CALIPER ASSEMBLY\nP/N: GM-45123-789\nFIT: 2018-2022 CHEVROLET EQUINOX\nFRONT LEFT DRIVER SIDE\nOEM QUALITY',
-          confidence: 94,
-          processingComplete: true
-        });
-      }, 2000);
+      const updatedImages = [...images, ...newImages];
+      const updatedFiles = [...imageFiles, ...filesToProcess];
+      setImages(updatedImages);
+      setImageFiles(updatedFiles);
+
+      await triggerOCRAnalysis(updatedFiles);
     }
   };
 
@@ -177,10 +201,11 @@ export function ListingCreator() {
       if (resp.ocr) {
         setOcrData({
           partNumber: resp.ocr.partNumber || ocrData.partNumber,
-            vehicleInfo: resp.ocr.vehicleInfo || ocrData.vehicleInfo,
-            rawText: resp.ocr.rawText || ocrData.rawText,
-            confidence: resp.ocr.confidence || ocrData.confidence,
-            processingComplete: true
+          vehicleInfo: resp.ocr.vehicleInfo || ocrData.vehicleInfo,
+          rawText: resp.ocr.rawText || ocrData.rawText,
+          detectedTexts: resp.ocr.detectedTexts || resp.ocr.textCandidates || ocrData.detectedTexts || [],
+          confidence: resp.ocr.confidence || ocrData.confidence,
+          processingComplete: true
         });
         if (!partNumber && resp.inferredPartNumber) setPartNumber(resp.inferredPartNumber);
       }
@@ -369,6 +394,7 @@ ${compatibility.map(c => `- ${c.year} ${c.make} ${c.model}`).join('\n')}
           partNumber: ocrData.partNumber,
           vehicleInfo: ocrData.vehicleInfo,
           rawText: ocrData.rawText,
+          detectedTexts: ocrData.detectedTexts,
           confidence: ocrData.confidence
         } : undefined,
         ai: aiSuggestions.title || aiSuggestions.description ? {
@@ -589,7 +615,7 @@ ${compatibility.map(c => `- ${c.year} ${c.make} ${c.model}`).join('\n')}
                 </div>
 
                 <TabsContent value="structured" className="space-y-3">
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div>
                       <Label className="text-blue-700">Part Number</Label>
                       <p className="text-sm font-mono bg-white p-3 rounded-lg border">
@@ -597,10 +623,18 @@ ${compatibility.map(c => `- ${c.year} ${c.make} ${c.model}`).join('\n')}
                       </p>
                     </div>
                     <div>
-                      <Label className="text-blue-700">Vehicle Information</Label>
-                      <p className="text-sm bg-white p-3 rounded-lg border">
-                        {ocrData.vehicleInfo || 'Not detected'}
-                      </p>
+                      <Label className="text-blue-700">Detected Text</Label>
+                      <div className="bg-white p-3 rounded-lg border max-h-40 overflow-y-auto space-y-2">
+                        {ocrData.detectedTexts.length ? (
+                          ocrData.detectedTexts.map((text, index) => (
+                            <p key={`${text}-${index}`} className="text-sm font-mono whitespace-pre-wrap">
+                              {text}
+                            </p>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500">No text detected</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </TabsContent>

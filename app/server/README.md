@@ -16,6 +16,10 @@ OPENAI_TEMPERATURE=0.4         # optional float
 OPENAI_BASE_URL=               # optional (Azure / proxy)
 OPENAI_MCP_CONNECTORS=         # optional comma separated connector IDs
 PORT=4000
+USE_NATIVE_TESSERACT=1         # prefer system tesseract binary when available
+USE_TESSERACT=0                # fallback to WASM (tesseract.js) if native fails
+OCR_CONCURRENCY=1              # simultaneous OCR jobs (raise once CPU allows)
+OCR_MAX_IMAGES=3               # cap images processed per request
 ```
 
 ## Scripts
@@ -24,6 +28,11 @@ npm run dev   # ts-node-dev
 npm run build # tsc -> dist
 npm start     # run compiled
 ```
+
+### Native OCR prerequisites
+- Install system tesseract binary (Ubuntu: `sudo apt-get install tesseract-ocr`)
+- Optional: language packs (e.g. `tesseract-ocr-eng`)
+The server automatically falls back to the WASM version if the binary is missing.
 
 ## Domain Model (Simplified)
 Vehicle:
@@ -65,6 +74,13 @@ Response sample:
 	inferredPartNumber: "..."
 }
 ```
+
+### OCR only
+POST /api/listings/ocr (multipart)
+Fields:
+- images[]: up to 20
+
+Returns only the OCR payload for faster UI refreshes.
 
 ## Replacing Stubs
 - OCR: implement in `services/ocrService.ts`

@@ -28,6 +28,13 @@ export async function generateListing(form: {
   return res.json();
 }
 
+export async function analyzeOCR(images: File[]): Promise<GenerateResponse> {
+  const fd = new FormData();
+  images.forEach(image => fd.append('images', image));
+  const res = await fetch(`${BASE_URL}/listings/ocr`, { method: 'POST', body: fd });
+  return res.json();
+}
+
 export async function fetchVehicles() {
   const res = await fetch(`${BASE_URL}/vehicles`);
   return res.json();

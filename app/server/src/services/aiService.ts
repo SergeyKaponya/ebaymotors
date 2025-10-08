@@ -1,5 +1,6 @@
 import { AISuggestionData, CompatibilityEntry, OCRResult } from '../domain/models';
 import { generateWithOpenAI } from './openaiService';
+import { inferPartNumber } from './partNumberResolver';
 const uuid = () => {
   try {
     // @ts-ignore
@@ -16,6 +17,12 @@ const uuid = () => {
 export interface AIGenerateParams {
   ocr: OCRResult;
   partNumber?: string;
+  vehicle?: {
+    make?: string;
+    model?: string;
+    year?: string | number;
+    vin?: string;
+  };
   existingCompatibility?: CompatibilityEntry[];
 }
 
@@ -26,8 +33,14 @@ export interface AIGenerateResult {
 }
 
 export async function generateListingData(params: AIGenerateParams): Promise<AIGenerateResult> {
-  const partNumber = params.partNumber || params.ocr.partNumber || 'GEN-1234';
-  const vehicleInfo = params.ocr.vehicleInfo || 'Unknown Vehicle';
+  const inferredPartNumber = await inferPartNumber({
+    ocr: params.ocr,
+    providedPartNumber: params.partNumber,
+    vehicle: params.vehicle
+  });
+
+  const partNumber = inferredPartNumber || params.ocr.partNumber || 'GEN-1234';
+  const vehicleInfo = deriveVehicleInfo(params.vehicle, params.ocr.vehicleInfo);
 
   const title = `${vehicleInfo} Component - OEM ${partNumber}`;
   const description = `High-quality automotive component for ${vehicleInfo}. Part number ${partNumber}. Inspected and verified. Auto-generated description.`;
@@ -46,6 +59,7 @@ export async function generateListingData(params: AIGenerateParams): Promise<AIG
   const aiRaw = await generateWithOpenAI({
     ocr: params.ocr,
     partNumber,
+    vehicle: params.vehicle,
     existingTitle: title,
     existingDescription: description,
     compatibility
@@ -60,4 +74,20 @@ export async function generateListingData(params: AIGenerateParams): Promise<AIG
     compatibility,
     inferredPartNumber: partNumber
   };
+}
+
+function deriveVehicleInfo(
+  vehicle: AIGenerateParams['vehicle'],
+  fallback?: string
+): string {
+  if (!vehicle) return fallback || 'Unknown Vehicle';
+  const parts = [
+    vehicle.year ? String(vehicle.year) : null,
+    vehicle.make || null,
+    vehicle.model || null
+  ].filter(Boolean);
+  if (parts.length) {
+    return parts.join(' ');
+  }
+  return fallback || 'Unknown Vehicle';
 }
